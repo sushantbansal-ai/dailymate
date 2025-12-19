@@ -1,0 +1,38 @@
+---
+alwaysApply: true
+---
+# React Native UI/UX and Code Standards Rule
+
+## Core Coding Standards
+- Use functional components with TypeScript and custom hooks only. Define prop interfaces with PascalCase.
+- Organize by feature folders: `features/{feature}/components/`, `features/{feature}/hooks/`, `features/{feature}/styles/`.
+- Always use StyleSheet.create() for styles. Favor react-native-reanimated for smooth animations over Animated API.
+- Optimize lists with FlatList: keyExtractor, getItemLayout, removeClippedSubviews=true, maxToRenderPerBatch=10.
+- Use Expo Router for navigation. Prefer React.memo() and useCallback/useMemo for performance.
+
+## UI/UX Standards
+- Follow Material Design 3 or iOS Human Interface Guidelines. Ensure 16dp touch targets minimum.
+- Accessibility: Add accessibilityLabel, accessibilityRole, accessibilityHint to all interactive elements. Support VoiceOver/TalkBack.
+- Responsive design: Use Dimensions API or react-native-responsive-screen. SafeAreaView for notches.
+- Colors: Define theme with light/dark mode using useColorScheme(). Semantic names: primary, secondary, error, surface.
+- Typography: Consistent scale with react-native-responsive-fontsize. Headings H1-H6, body text 16sp base.
+- Spacing: 4px grid system (4,8,12,16,24,32,40). No hard-coded pixels.
+
+## Sass/Styling Rules (if using react-native-sass-transformer)
+- Nest selectors logically, use BEM methodology. Variables for theme: $primary-color, $spacing-sm.
+- No CSS cursor properties – React Native doesn't support them. Use pointerEvents='none' or TouchableOpacity for interactions.
+- Media queries via Dimensions.get('window').width checks.
+
+## Mandatory Post-Generation Workflow
+After writing any code:
+1. **Self-Review**: Scan for violations of above standards. List issues in comments.
+2. **UX Case Analysis**: 
+   - Edge cases: Empty states, loading, errors, network failure.
+   - User flows: Onboarding, errors, back navigation, offline mode.
+   - Accessibility: Screen reader flow, high contrast, reduced motion.
+   - Performance: Bundle size < 50MB, cold start < 2s, FPS > 55.
+3. **Final Adjustments**: Apply fixes. Add error boundaries, skeleton loaders. Test on iOS/Android.
+4. **Output Format**: Comment "✅ PASSED REVIEW" or list remaining issues. Never commit un-reviewed code.
+
+## Enforcement
+- Before finalizing code, output a checklist:
