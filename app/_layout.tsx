@@ -251,6 +251,16 @@ export default function RootLayout() {
               }}
             />
             
+            {/* Sync screens */}
+            <Stack.Screen
+              name="sync/index"
+              options={{
+                headerShown: false,
+                title: 'Google Sheets Sync',
+                presentation: 'card',
+              }}
+            />
+            
             {/* Modal */}
             <Stack.Screen
               name="modal"

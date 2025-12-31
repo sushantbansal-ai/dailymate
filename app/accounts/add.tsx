@@ -12,6 +12,7 @@ import * as NotificationService from '@/services/notifications';
 import { Account, AccountDetails, AccountType } from '@/types';
 import { ACCOUNT_COLORS, getAccountIcon, getScrollViewBottomPadding } from '@/utils/constants';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';

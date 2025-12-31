@@ -145,6 +145,17 @@ export default function SettingsScreen() {
         router.push('/security');
       },
     },
+    {
+      id: 'sync',
+      title: 'Google Sheets Sync',
+      subtitle: 'Sync data with Google Sheets',
+      icon: 'cloud-sync',
+      iconColor: colors.success,
+      onPress: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push('/sync');
+      },
+    },
   ];
 
   return (

@@ -1,6 +1,8 @@
 import * as NotificationService from '@/services/notifications';
 import * as PlannedTransactionService from '@/services/planned-transactions';
 import * as Storage from '@/services/storage';
+import * as GoogleSheets from '@/services/google-sheets';
+import * as SyncService from '@/services/sync';
 import { Account, Bill, Budget, Category, Contact, Goal, Label, PlannedTransaction, Transaction } from '@/types';
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
@@ -114,6 +116,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  // Auto-sync to Google Sheets if enabled
+  const autoSyncToSheets = async () => {
+    try {
+      const config = await GoogleSheets.getConfig();
+      if (config.enabled && config.spreadsheetId) {
+        // Sync in background without blocking UI
+        SyncService.syncAllToSheets(config.spreadsheetId).catch((error) => {
+          console.error('Auto-sync error:', error);
+        });
+      }
+    } catch (error) {
+      console.error('Error checking sync config:', error);
+    }
+  };
+
   const addAccount = async (account: Account) => {
     await Storage.addAccount(account);
     await loadData();
@@ -123,10 +140,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling notifications:', error);
     }
+    // Auto-sync to Google Sheets if enabled
+    await autoSyncToSheets();
   };
 
   const updateAccount = async (account: Account) => {
+    // Get the old account to compare balance
+    const oldAccount = accounts.find((a) => a.id === account.id);
+    const balanceChanged = oldAccount && oldAccount.balance !== account.balance;
+    const balanceDifference = oldAccount ? account.balance - oldAccount.balance : 0;
+
     await Storage.updateAccount(account);
+    
+    // Create adjustment transaction if balance changed
+    if (balanceChanged && balanceDifference !== 0) {
+      try {
+        // Find or use default adjustment categories
+        const adjustmentCategoryId = balanceDifference > 0 
+          ? categories.find(c => c.id === 'other-income')?.id || 'other-income'
+          : categories.find(c => c.id === 'other-expense')?.id || 'other-expense';
+        
+        const adjustmentTransaction: Transaction = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          accountId: account.id,
+          categoryId: adjustmentCategoryId,
+          type: balanceDifference > 0 ? 'income' : 'expense',
+          amount: Math.abs(balanceDifference),
+          description: `[Adjustment] Balance correction for ${account.name} (from ${oldAccount.balance.toFixed(2)} to ${account.balance.toFixed(2)})`,
+          date: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+          status: 'completed',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        
+        await Storage.addTransaction(adjustmentTransaction);
+        console.log(`Created adjustment transaction for account ${account.name}: ${balanceDifference > 0 ? '+' : ''}${balanceDifference.toFixed(2)}`);
+      } catch (error) {
+        console.error('Error creating adjustment transaction:', error);
+        // Don't fail the account update if transaction creation fails
+      }
+    }
+    
     await loadData();
     // Reschedule notifications for the updated account
     try {
@@ -142,6 +196,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const deleteAccount = async (accountId: string) => {
@@ -159,6 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await Storage.deleteTransaction(transaction.id);
     }
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addTransaction = async (transaction: Transaction) => {
@@ -292,6 +348,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error('Error checking budget thresholds:', error);
       }
     }
+    await autoSyncToSheets();
   };
 
   const deleteTransaction = async (transactionId: string) => {
@@ -327,16 +384,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await Storage.deleteTransaction(transactionId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addCategory = async (category: Category) => {
     await Storage.addCategory(category);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const updateCategory = async (category: Category) => {
     await Storage.updateCategory(category);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const deleteCategory = async (categoryId: string) => {
@@ -347,36 +407,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await Storage.deleteCategory(categoryId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addLabel = async (label: Label) => {
     await Storage.addLabel(label);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const updateLabel = async (label: Label) => {
     await Storage.updateLabel(label);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const deleteLabel = async (labelId: string) => {
     await Storage.deleteLabel(labelId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addContact = async (contact: Contact) => {
     await Storage.addContact(contact);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const updateContact = async (contact: Contact) => {
     await Storage.updateContact(contact);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const deleteContact = async (contactId: string) => {
     await Storage.deleteContact(contactId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addBudget = async (budget: Budget) => {
@@ -388,6 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling budget notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const updateBudget = async (budget: Budget) => {
@@ -400,6 +468,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling budget notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const deleteBudget = async (budgetId: string) => {
@@ -411,6 +480,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await Storage.deleteBudget(budgetId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addGoal = async (goal: Goal) => {
@@ -447,6 +517,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling goal notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const deleteGoal = async (goalId: string) => {
@@ -458,6 +529,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await Storage.deleteGoal(goalId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addPlannedTransaction = async (plannedTransaction: PlannedTransaction) => {
@@ -469,6 +541,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling planned transaction notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const updatePlannedTransaction = async (plannedTransaction: PlannedTransaction) => {
@@ -481,6 +554,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling planned transaction notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const deletePlannedTransaction = async (plannedTransactionId: string) => {
@@ -492,6 +566,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await Storage.deletePlannedTransaction(plannedTransactionId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const addBill = async (bill: Bill) => {
@@ -506,6 +581,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling bill notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const updateBill = async (bill: Bill) => {
@@ -521,6 +597,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error scheduling bill notifications:', error);
     }
+    await autoSyncToSheets();
   };
 
   const deleteBill = async (billId: string) => {
@@ -532,6 +609,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     await Storage.deleteBill(billId);
     await loadData();
+    await autoSyncToSheets();
   };
 
   const refreshData = async () => {

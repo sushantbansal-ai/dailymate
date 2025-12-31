@@ -18,11 +18,13 @@ import { sortTransactionsByDate } from '@/utils/transaction-helpers';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AllTransactionsScreen() {
-  const { transactions, accounts, categories, loading, refreshData } = useApp();
+  const { transactions, accounts, categories, loading, refreshData, deleteTransaction } = useApp();
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -74,6 +76,29 @@ export default function AllTransactionsScreen() {
     return count;
   }, [currentFilters]);
 
+  const handleDelete = useCallback((transactionId: string) => {
+    Alert.alert(
+      'Delete Transaction',
+      'Are you sure you want to delete this transaction? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await deleteTransaction(transactionId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Failed to delete transaction');
+            }
+          },
+        },
+      ]
+    );
+  }, [deleteTransaction]);
+
   const renderTransaction = useCallback(({ item: transaction }: { item: typeof transactions[0] }) => {
     const category = getCategory(transaction.categoryId);
     const account = accounts.find((a) => a.id === transaction.accountId);
@@ -83,72 +108,102 @@ export default function AllTransactionsScreen() {
     const splitCount = transaction.splits?.length || 0;
 
     return (
-      <Card variant="default" padding="lg" style={styles.transactionCard}>
-        <View style={styles.transactionRow}>
-          <View style={styles.transactionLeft}>
-            <View style={[styles.categoryIconContainer, { backgroundColor: category?.color ? category.color + '20' : colors.backgroundSecondary }]}>
-              <ThemedText style={styles.categoryIcon}>
-                {category?.icon || '💰'}
-              </ThemedText>
-              {isSplit && (
-                <View style={[styles.splitBadge, { backgroundColor: colors.primary }]}>
-                  <MaterialIcons name="call-split" size={12} color="#FFFFFF" />
-                </View>
-              )}
-            </View>
-            <View style={styles.transactionInfo}>
-              <View style={styles.transactionDescriptionRow}>
-                <ThemedText style={[Typography.bodyLarge, styles.transactionDescription, { color: colors.text }]}>
-                  {transaction.description}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push(`/transactions/add?id=${transaction.id}`);
+        }}>
+        <Card variant="default" padding="lg" style={styles.transactionCard}>
+          <View style={styles.transactionRow}>
+            <View style={styles.transactionLeft}>
+              <View style={[styles.categoryIconContainer, { backgroundColor: category?.color ? category.color + '20' : colors.backgroundSecondary }]}>
+                <ThemedText style={styles.categoryIcon}>
+                  {category?.icon || '💰'}
                 </ThemedText>
                 {isSplit && (
-                  <View style={[styles.splitIndicator, { backgroundColor: colors.primary + '20' }]}>
-                    <MaterialIcons name="call-split" size={14} color={colors.primary} />
-                    <ThemedText style={[Typography.labelSmall, { color: colors.primary, marginLeft: 2 }]}>
-                      {splitCount}
-                    </ThemedText>
+                  <View style={[styles.splitBadge, { backgroundColor: colors.primary }]}>
+                    <MaterialIcons name="call-split" size={12} color="#FFFFFF" />
                   </View>
                 )}
               </View>
-              <View style={styles.transactionMeta}>
-                <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
-                  {formatDate(transaction.date, 'medium')}
-                </ThemedText>
-                {account && (
-                  <>
-                    <ThemedText style={[Typography.bodySmall, { color: colors.textTertiary, marginHorizontal: Spacing.xs }]}>•</ThemedText>
-                    <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
-                      {account.name}
-                    </ThemedText>
-                  </>
-                )}
-                {!isSplit && category && (
-                  <>
-                    <ThemedText style={[Typography.bodySmall, { color: colors.textTertiary, marginHorizontal: Spacing.xs }]}>•</ThemedText>
-                    <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
-                      {category.name}
-                    </ThemedText>
-                  </>
-                )}
-                {isSplit && (
-                  <>
-                    <ThemedText style={[Typography.bodySmall, { color: colors.textTertiary, marginHorizontal: Spacing.xs }]}>•</ThemedText>
-                    <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
-                      {splitCount} categor{splitCount === 1 ? 'y' : 'ies'}
-                    </ThemedText>
-                  </>
-                )}
+              <View style={styles.transactionInfo}>
+                <View style={styles.transactionDescriptionRow}>
+                  <ThemedText style={[Typography.bodyLarge, styles.transactionDescription, { color: colors.text }]}>
+                    {transaction.description}
+                  </ThemedText>
+                  {isSplit && (
+                    <View style={[styles.splitIndicator, { backgroundColor: colors.primary + '20' }]}>
+                      <MaterialIcons name="call-split" size={14} color={colors.primary} />
+                      <ThemedText style={[Typography.labelSmall, { color: colors.primary, marginLeft: 2 }]}>
+                        {splitCount}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.transactionMeta}>
+                  <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
+                    {formatDate(transaction.date, 'medium')}
+                  </ThemedText>
+                  {account && (
+                    <>
+                      <ThemedText style={[Typography.bodySmall, { color: colors.textTertiary, marginHorizontal: Spacing.xs }]}>•</ThemedText>
+                      <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
+                        {account.name}
+                      </ThemedText>
+                    </>
+                  )}
+                  {!isSplit && category && (
+                    <>
+                      <ThemedText style={[Typography.bodySmall, { color: colors.textTertiary, marginHorizontal: Spacing.xs }]}>•</ThemedText>
+                      <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
+                        {category.name}
+                      </ThemedText>
+                    </>
+                  )}
+                  {isSplit && (
+                    <>
+                      <ThemedText style={[Typography.bodySmall, { color: colors.textTertiary, marginHorizontal: Spacing.xs }]}>•</ThemedText>
+                      <ThemedText style={[Typography.bodySmall, styles.transactionMetaText, { color: colors.textSecondary }]}>
+                        {splitCount} categor{splitCount === 1 ? 'y' : 'ies'}
+                      </ThemedText>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+            <View style={styles.transactionRight}>
+              <ThemedText style={[Typography.h4, styles.transactionAmount, { color: amountColor }]}>
+                {isExpense ? '-' : '+'}
+                {formatCurrency(transaction.amount)}
+              </ThemedText>
+              <View style={styles.transactionActions}>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(`/transactions/add?id=${transaction.id}`);
+                  }}
+                  style={styles.actionIcon}
+                  activeOpacity={0.7}>
+                  <MaterialIcons name="edit" size={20} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDelete(transaction.id);
+                  }}
+                  style={styles.actionIcon}
+                  activeOpacity={0.7}>
+                  <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
-          <ThemedText style={[Typography.h4, styles.transactionAmount, { color: amountColor }]}>
-            {isExpense ? '-' : '+'}
-            {formatCurrency(transaction.amount)}
-          </ThemedText>
-        </View>
-      </Card>
+        </Card>
+      </TouchableOpacity>
     );
-  }, [getCategory, accounts, getTransactionTypeColor, formatCurrency, formatDate, colors]);
+  }, [getCategory, accounts, getTransactionTypeColor, formatCurrency, formatDate, colors, router, handleDelete]);
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
@@ -316,9 +371,21 @@ const styles = StyleSheet.create({
   transactionMetaText: {
     lineHeight: 18,
   },
+  transactionRight: {
+    alignItems: 'flex-end',
+    marginLeft: Spacing.md,
+  },
   transactionAmount: {
     fontWeight: '600',
-    marginLeft: Spacing.lg,
+    marginBottom: Spacing.xs,
+  },
+  transactionActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  actionIcon: {
+    padding: Spacing.xs,
   },
   emptyContainer: {
     flex: 1,

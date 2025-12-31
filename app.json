@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "DailyMate",
-    "slug": "DailyMate",
+    "slug": "dailymate",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -68,6 +68,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f93ee6dd-a9bd-4756-b161-b134d18301b9"
+      }
+    },
+    "owner": "buildingdots"
   }
 }
